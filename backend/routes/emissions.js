@@ -8,6 +8,8 @@
 const express = require("express");
 const router = express.Router();
 
+const { calculateTravelEmissions } = require("../services/climatiq");
+
 // Emission factors in kg CO2 per km per passenger (rough illustrative values)
 const VEHICLE_FACTORS = {
   car: {
@@ -47,7 +49,7 @@ const VEHICLE_FACTORS = {
 
 // Food emissions per person per year (kg CO2e), rough
 const FOOD_FACTORS = {
-  none: 0,  
+  none: 0,
   meat_heavy: 3500,
   average: 2500,
   vegetarian: 1700,
@@ -60,10 +62,14 @@ const ELECTRICITY_FACTOR = 0.82; // kg CO2 per kWh (example)
 // Waste emissions
 const WASTE_LANDFILL_FACTOR = 0.5; // kg CO2 per kg waste landfilled
 
-router.post("/calculate", (req, res) => {
+// Water emissions (supply + treatment), rough value
+// ~0.0003 kg CO2 per litre (0.3 kg per m³)
+const WATER_FACTOR_PER_LITRE = 0.0003;
+
+router.post("/calculate", async (req, res) => {
   console.log("Received /api/emissions/calculate request", req.body);
 
-    const {
+  const {
     carKm,
     vehicleType,
     fuelType,
@@ -79,13 +85,33 @@ router.post("/calculate", (req, res) => {
   const type = vehicleType || "car";
 
   // Transport emissions
-  const vehicleFactors = VEHICLE_FACTORS[type] || {};
-  const perKmFactor =
-    vehicleFactors[fuelType] ??
-    vehicleFactors.default ??
-    0;
+  let transportCO2 = 0;
+  try {
+    if (km > 0 && (type === "car" || type === "bike")) {
+      // Use Climatiq for car/bike travel
+      transportCO2 = await calculateTravelEmissions({
+        distance_km: km,
+        fuelType
+      });
+    } else {
+      // Use static factors for other vehicle types (bus, train, flights, etc.)
+      const vehicleFactors = VEHICLE_FACTORS[type] || {};
+      const perKmFactor =
+        vehicleFactors[fuelType] ??
+        vehicleFactors.default ??
+        0;
 
-  const transportCO2 = km * perKmFactor;
+      transportCO2 = km * perKmFactor;
+    }
+  } catch (e) {
+    console.error("Transport CO2 calculation failed, falling back to static factors:", e);
+    const vehicleFactors = VEHICLE_FACTORS[type] || {};
+    const perKmFactor =
+      vehicleFactors[fuelType] ??
+      vehicleFactors.default ??
+      0;
+    transportCO2 = km * perKmFactor;
+  }
 
   // Electricity emissions
   const electricityCO2 = electricity * ELECTRICITY_FACTOR;
@@ -95,31 +121,22 @@ router.post("/calculate", (req, res) => {
   let foodCO2;
   if (diet === "none") {
     foodCO2 = 0;
-  }  else {
-      foodCO2 = FOOD_FACTORS[diet] ?? FOOD_FACTORS.average;
-  } 
+  } else {
+    foodCO2 = FOOD_FACTORS[diet] ?? FOOD_FACTORS.average;
+  }
 
-  
-  
-
- const WASTE_LANDFILL_FACTOR = 0.5; // kg CO2 per kg waste landfilled
-  // Water emissions (supply + treatment), rough value
-  // ~0.0003 kg CO2 per litre (0.3 kg per m³)
-  const WATER_FACTOR_PER_LITRE = 0.0003;
   // Waste & recycling emissions
   const wasteKg = Number(wasteKgPerWeek) || 0;
   const recyclePct = Math.min(Math.max(Number(recyclingRate) || 0, 0), 100) / 100;
   const landfilledKgPerYear = wasteKg * 52 * (1 - recyclePct);
   const wasteCO2 = landfilledKgPerYear * WASTE_LANDFILL_FACTOR;
-   const waterLitresPerDayNum = Number(waterLitersPerDay) || 0;
+
+  // Water usage emissions
+  const waterLitresPerDayNum = Number(waterLitersPerDay) || 0;
   const waterLitresPerYear = waterLitresPerDayNum * 365;
-   const waterCO2 = waterLitresPerYear * WATER_FACTOR_PER_LITRE;
+  const waterCO2 = waterLitresPerYear * WATER_FACTOR_PER_LITRE;
 
   const total = transportCO2 + electricityCO2 + foodCO2 + wasteCO2 + waterCO2;
-
-
-
-
 
   res.json({
     vehicleType: type,
