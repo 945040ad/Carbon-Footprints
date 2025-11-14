@@ -91,22 +91,7 @@
         const vehicleTypeSelect = document.getElementById("vehicleType");
         const fuelTypeSelect = document.getElementById("fuelType");
 
-  function updateFuelTypeLock() {
-    const vt = vehicleTypeSelect.value;
-
-    if (vt === "train") {
-      // Train → Electric only
-      fuelTypeSelect.value = "electricity";
-      fuelTypeSelect.disabled = true;
-    } else if (vt === "bus" || vt === "flight_short" || vt === "flight_long") {
-      // Bus / Flights → Diesel only
-      fuelTypeSelect.value = "diesel";
-      fuelTypeSelect.disabled = true;
-    } else {
-      // Car, Bike, etc. → user can choose
-      fuelTypeSelect.disabled = false;
-    }
-  }
+  
 
   // Initial lock and on change
   updateFuelTypeLock();
