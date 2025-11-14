@@ -53,40 +53,77 @@
 //   calculateTravelEmissions,
 //   calculateElectricityEmissions,
 // };
+// const axios = require("axios");
+
+// const CLIMATIQ_API_KEY = process.env.CLIMATIQ_API_KEY;
+// const CLIMATIQ_BASE_URL = "https://api.climatiq.io";
+
+// if (!CLIMATIQ_API_KEY) {
+//   console.warn("Warning: CLIMATIQ_API_KEY is not set. Emission calculations will fail.");
+// }
+
+// const client = axios.create({
+//   baseURL: CLIMATIQ_BASE_URL,
+//   headers: {
+//     Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+//     "Content-Type": "application/json",
+//   },
+// });
+
+// // Example: calculate travel emissions by distance (km, car).
+// // Uses a sample factor from Climatiq's docs for car travel.
+// async function calculateTravelEmissions({ distance_km }) {
+//   const emissionFactor = "passenger_vehicle-vehicle_type_car-fuel_source_na-distance_na";
+
+//   const body = {
+//     emission_factor: emissionFactor,
+//     parameters: {
+//       distance: distance_km,
+//       distance_unit: "km",
+//     },
+//   };
+
+//   const { data } = await client.post("/estimate", body);
+//   return data.co2e; // kg CO2e
+// }
+
+// module.exports = {
+//   calculateTravelEmissions,
+// };
+
+
+
+
+
 const axios = require("axios");
 
-const CLIMATIQ_API_KEY = process.env.CLIMATIQ_API_KEY;
-const CLIMATIQ_BASE_URL = "https://api.climatiq.io";
+const API_URL = "https://beta3.api.climatiq.io/estimate";
 
-if (!CLIMATIQ_API_KEY) {
-  console.warn("Warning: CLIMATIQ_API_KEY is not set. Emission calculations will fail.");
+async function calculateTravelEmissions({ distance_km, fuelType }) {
+  try {
+    const response = await axios.post(
+      API_URL,
+      {
+        model: "cm_91C1YjSmxJdnMJnQHQx5y8", // Official car emissions model
+        parameters: {
+          distance: distance_km,
+          distance_unit: "km",
+          fuel_type: fuelType
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.CLIMATIQ_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    return response.data.co2e;
+  } catch (err) {
+    console.error("Climatiq API Error:", err.response?.data || err.message);
+    return 0;
+  }
 }
 
-const client = axios.create({
-  baseURL: CLIMATIQ_BASE_URL,
-  headers: {
-    Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
-    "Content-Type": "application/json",
-  },
-});
-
-// Example: calculate travel emissions by distance (km, car).
-// Uses a sample factor from Climatiq's docs for car travel.
-async function calculateTravelEmissions({ distance_km }) {
-  const emissionFactor = "passenger_vehicle-vehicle_type_car-fuel_source_na-distance_na";
-
-  const body = {
-    emission_factor: emissionFactor,
-    parameters: {
-      distance: distance_km,
-      distance_unit: "km",
-    },
-  };
-
-  const { data } = await client.post("/compute", body);
-  return data.co2e; // kg CO2e
-}
-
-module.exports = {
-  calculateTravelEmissions,
-};
+module.exports = { calculateTravelEmissions };

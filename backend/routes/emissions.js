@@ -55,9 +55,9 @@
 
 
 
-// const express = require("express");
-// const router = express.Router();
-// const { calculateTravelEmissions } = require("../services/climatiq");
+const express = require("express");
+const router = express.Router();
+const { calculateTravelEmissions } = require("../services/climatiq");
 
 // // Simple in-memory store for now
 // const records = [];
@@ -122,10 +122,12 @@ router.post("/calculate", async (req, res) => {
     res.json({
       travelCo2,
       electricityCo2,
-      total
+      total,
     });
   } catch (err) {
     console.error("Error:", err);
     res.status(500).json({ error: "Failed to calculate emissions" });
   }
 });
+
+module.exports = router;
