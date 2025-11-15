@@ -75,6 +75,7 @@ router.post("/calculate", async (req, res) => {
     fuelType,
     electricityUsage,
     dietType,
+    mealsPerDay,
     wasteKgPerWeek,
     recyclingRate,
     waterLitersPerDay
@@ -122,7 +123,12 @@ router.post("/calculate", async (req, res) => {
   if (diet === "none") {
     foodCO2 = 0;
   } else {
-    foodCO2 = FOOD_FACTORS[diet] ?? FOOD_FACTORS.average;
+    // Base annual emissions assume 3 meals per day (standard)
+    const baseFoodCO2 = FOOD_FACTORS[diet] ?? FOOD_FACTORS.average;
+    const meals = Number(mealsPerDay) || 3;
+    // Adjust based on actual meals per day (standard is 3 meals/day)
+    // If someone eats 2 meals/day, multiply by 2/3. If 4 meals/day, multiply by 4/3, etc.
+    foodCO2 = baseFoodCO2 * (meals / 3);
   }
 
   // Waste & recycling emissions

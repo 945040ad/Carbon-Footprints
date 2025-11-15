@@ -22,6 +22,10 @@
         <select id="vehicleType">
           <option value="car">Car</option>
           <option value="bike">Bike</option>
+          <option value="bus">Bus</option>
+          <option value="train">Train</option>
+          <option value="flight_short">Short Flight</option>
+          <option value="flight_long">Long Flight</option>
         </select>
 
         <label for="fuelType">Fuel Type:</label>
@@ -52,7 +56,9 @@
           <option value="vegetarian">Vegetarian</option>
           <option value="vegan">Vegan</option>
         </select>
-        <span class="hint">Rough annual emissions per person depending on diet.</span>
+        <label for="mealsPerDay">Meals per Day:</label>
+        <input type="number" id="mealsPerDay" placeholder="e.g. 3" value="3" min="0" max="10" />
+        <span class="hint">Rough annual emissions per person depending on diet. Enter how many meals you eat per day (typically 2-3).</span>
       </div>
 
       <!-- Waste & Recycling -->
@@ -113,26 +119,35 @@
     updateFuelTypeLock();
     vehicleTypeSelect.addEventListener("change", updateFuelTypeLock);
 
+    function toNumber(value, fallback = 0) {
+      const n = parseFloat(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
     document.getElementById("calculateBtn").onclick = async () => {
       try {
-        const carKm = document.getElementById("carKm").value;
+        // Read and convert inputs to numbers where appropriate
+        const carKm = toNumber(document.getElementById("carKm").value, 0);
         const vehicleType = vehicleTypeSelect.value;
         const fuelType = fuelTypeSelect.value;
-        const electricityUsage = document.getElementById("electricityUsage").value;
+        const electricityUsage = toNumber(document.getElementById("electricityUsage").value, 0);
         const dietType = document.getElementById("dietType").value;
-        const wasteKgPerWeek = document.getElementById("wasteKgPerWeek").value;
-        const recyclingRate = document.getElementById("recyclingRate").value;
-        const waterLitersPerDay = document.getElementById("waterLitersPerDay").value;
+        const mealsPerDay = toNumber(document.getElementById("mealsPerDay").value, 3);
+        const wasteKgPerWeek = toNumber(document.getElementById("wasteKgPerWeek").value, 0);
+        const recyclingRate = toNumber(document.getElementById("recyclingRate").value, 0);
+        const waterLitersPerDay = toNumber(document.getElementById("waterLitersPerDay").value, 0);
 
         const response = await fetch("http://localhost:5001/api/emissions/calculate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            // send numeric fields as numbers
             carKm,
             vehicleType,
             fuelType,
             electricityUsage,
             dietType,
+            mealsPerDay,
             wasteKgPerWeek,
             recyclingRate,
             waterLitersPerDay
@@ -144,13 +159,22 @@
         }
 
         const data = await response.json();
+
+        // Coerce server values to numbers for safe formatting
+        const total = toNumber(data.total, 0);
+        const transportCO2 = toNumber(data.transportCO2, 0);
+        const electricityCO2 = toNumber(data.electricityCO2, 0);
+        const foodCO2 = toNumber(data.foodCO2, 0);
+        const wasteCO2 = toNumber(data.wasteCO2, 0);
+        const waterCO2 = toNumber(data.waterCO2, 0);
+
         document.getElementById("result").innerHTML =
-          `<div><strong>Total CO₂ Emissions: ${data.total.toFixed(2)} kg/year</strong></div>` +
-          `<div>Transport: ${data.transportCO2.toFixed(2)} kg</div>` +
-          `<div>Electricity: ${data.electricityCO2.toFixed(2)} kg</div>` +
-          `<div>Food: ${data.foodCO2.toFixed(2)} kg</div>` +
-          `<div>Waste: ${data.wasteCO2.toFixed(2)} kg</div>` +
-          `<div>Water: ${data.waterCO2.toFixed(2)} kg</div>`;
+          `<div><strong>Total CO₂ Emissions: ${total.toFixed(2)} kg/year</strong></div>` +
+          `<div>Transport: ${transportCO2.toFixed(2)} kg</div>` +
+          `<div>Electricity: ${electricityCO2.toFixed(2)} kg</div>` +
+          `<div>Food: ${foodCO2.toFixed(2)} kg</div>` +
+          `<div>Waste: ${wasteCO2.toFixed(2)} kg</div>` +
+          `<div>Water: ${waterCO2.toFixed(2)} kg</div>`;
       } catch (err) {
         console.error(err);
         document.getElementById("result").innerText = `Error: ${err.message}`;
